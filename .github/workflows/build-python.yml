@@ -1,0 +1,72 @@
+name: Build and Push Python Consumer
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'key-generator-consumer/**'
+      - '.github/workflows/build-python.yml'
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: key-generator-consumer
+  HARBOR_REGISTRY: harbor.javajon.duckdns.org
+  HARBOR_PROJECT: jj
+  VERSION: '1.0.0'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Harbor
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.HARBOR_REGISTRY }}
+        username: ${{ secrets.HARBOR_USERNAME }}
+        password: ${{ secrets.HARBOR_PASSWORD }}
+
+    - name: Generate image tags
+      id: meta
+      run: |
+        SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+        echo "IMAGE_TAG=${{ env.VERSION }}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+        echo "LATEST_TAG=${{ env.VERSION }}" >> $GITHUB_OUTPUT
+        echo "Generated tags:"
+        echo "  - ${{ env.VERSION }}-${SHORT_SHA}"
+        echo "  - ${{ env.VERSION }}"
+
+    - name: Build and push image to Harbor
+      uses: docker/build-push-action@v5
+      with:
+        context: ./key-generator-consumer
+        push: true
+        tags: |
+          ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.IMAGE_TAG }}
+          ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.LATEST_TAG }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Image summary
+      run: |
+        echo "### :snake: Python Consumer Image Published" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Registry:** ${{ env.HARBOR_REGISTRY }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Project:** ${{ env.HARBOR_PROJECT }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Image:** ${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+        echo "- \`${{ steps.meta.outputs.IMAGE_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- \`${{ steps.meta.outputs.LATEST_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Full image path:**" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.LATEST_TAG }}" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

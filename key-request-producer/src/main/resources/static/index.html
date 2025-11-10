@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RabbitMQ Key Generator Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .clear-btn {
+            background-color: #f44336;
+        }
+        .clear-btn:hover {
+            background-color: #da190b;
+        }
+        .keys-list {
+            margin-top: 30px;
+        }
+        .key-item {
+            background-color: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .key-value {
+            font-family: monospace;
+            font-size: 14px;
+            color: #2196F3;
+            word-break: break-all;
+        }
+        .key-meta {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .status.info {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+        .status.success {
+            background-color: #e8f5e9;
+            color: #388e3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RabbitMQ Async Processing Demo</h1>
+        <p class="subtitle">
+            Click the button to request key generation. The request goes to RabbitMQ,
+            a Python service processes it asynchronously, and the result appears below.
+        </p>
+
+        <div>
+            <button onclick="requestKey()">Request New Key</button>
+            <button class="clear-btn" onclick="clearKeys()">Clear All Keys</button>
+        </div>
+
+        <div id="status" class="status info" style="display:none;"></div>
+
+        <div class="keys-list">
+            <h2>Generated Keys (<span id="keyCount">0</span>)</h2>
+            <div id="keysList"></div>
+        </div>
+    </div>
+
+    <script>
+        let pollingInterval;
+
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        async function requestKey() {
+            try {
+                const response = await fetch('./api/keys/request', {
+                    method: 'POST'
+                });
+                const requestId = await response.text();
+                showStatus(`Key request sent! Request ID: ${requestId}`, 'success');
+            } catch (error) {
+                showStatus('Error requesting key: ' + error.message, 'error');
+            }
+        }
+
+        async function fetchGeneratedKeys() {
+            try {
+                const response = await fetch('./api/keys/generated');
+                const keys = await response.json();
+                updateKeysList(keys);
+            } catch (error) {
+                console.error('Error fetching keys:', error);
+            }
+        }
+
+        function updateKeysList(keys) {
+            const keysList = document.getElementById('keysList');
+            const keyCount = document.getElementById('keyCount');
+
+            keyCount.textContent = keys.length;
+
+            if (keys.length === 0) {
+                keysList.innerHTML = '<p style="color: #999;">No keys generated yet. Click the button above to request one!</p>';
+                return;
+            }
+
+            keysList.innerHTML = keys.map(key => `
+                <div class="key-item">
+                    <div class="key-value">${key.key}</div>
+                    <div class="key-meta">
+                        Request ID: ${key.requestId} |
+                        Generated: ${new Date(key.generatedAt).toLocaleString()}
+                    </div>
+                </div>
+            `).reverse().join('');
+        }
+
+        async function clearKeys() {
+            if (!confirm('Clear all generated keys?')) return;
+
+            try {
+                await fetch('./api/keys/clear', {
+                    method: 'DELETE'
+                });
+                showStatus('All keys cleared', 'success');
+                fetchGeneratedKeys();
+            } catch (error) {
+                showStatus('Error clearing keys: ' + error.message, 'error');
+            }
+        }
+
+        // Start polling for new keys every 2 seconds
+        pollingInterval = setInterval(fetchGeneratedKeys, 2000);
+
+        // Initial fetch
+        fetchGeneratedKeys();
+    </script>
+</body>
+</html>

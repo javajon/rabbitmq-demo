@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: key-generator-consumer
+  namespace: rabbitmq-demo
+  labels:
+    app: key-generator-consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: key-generator-consumer
+  template:
+    metadata:
+      labels:
+        app: key-generator-consumer
+    spec:
+      imagePullSecrets:
+      - name: harbor-pull-secret
+      containers:
+      - name: key-generator-consumer
+        image: harbor.javajon.duckdns.org/jj/key-generator-consumer:1.0.0
+        imagePullPolicy: Always
+        env:
+        - name: RABBITMQ_HOST
+          value: "rabbitmq.rabbitmq.svc.cluster.local"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          value: "admin"
+        - name: RABBITMQ_PASS
+          value: "admin"
+        - name: REQUEST_QUEUE
+          value: "key-requests"
+        - name: RESPONSE_QUEUE
+          value: "generated-keys"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"

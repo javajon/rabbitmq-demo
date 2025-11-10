@@ -1,0 +1,91 @@
+name: Build and Push Spring Boot Producer
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'key-request-producer/**'
+      - '.github/workflows/build-spring.yml'
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: key-request-producer
+  HARBOR_REGISTRY: harbor.javajon.duckdns.org
+  HARBOR_PROJECT: jj
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+
+    - name: Make gradlew executable
+      run: chmod +x key-request-producer/gradlew
+
+    - name: Extract version from build.gradle
+      id: get-version
+      run: |
+        VERSION=$(grep "^version = " key-request-producer/build.gradle | cut -d "'" -f 2)
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "Extracted version: $VERSION"
+
+    - name: Generate image tags
+      id: meta
+      run: |
+        SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+        echo "IMAGE_TAG=${{ steps.get-version.outputs.VERSION }}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+        echo "LATEST_TAG=${{ steps.get-version.outputs.VERSION }}" >> $GITHUB_OUTPUT
+        echo "Generated tags:"
+        echo "  - ${{ steps.get-version.outputs.VERSION }}-${SHORT_SHA}"
+        echo "  - ${{ steps.get-version.outputs.VERSION }}"
+
+    - name: Build and push image to Harbor
+      working-directory: ./key-request-producer
+      env:
+        HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+        HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+      run: |
+        # Build image with commit SHA tag
+        ./gradlew bootBuildImage \
+          --imageName=${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.IMAGE_TAG }}
+
+        # Login to Harbor
+        echo "$HARBOR_PASSWORD" | docker login ${{ env.HARBOR_REGISTRY }} -u "$HARBOR_USERNAME" --password-stdin
+
+        # Push image with commit SHA tag
+        docker push ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.IMAGE_TAG }}
+
+        # Tag and push as latest version
+        docker tag \
+          ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.IMAGE_TAG }} \
+          ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.LATEST_TAG }}
+        docker push ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.LATEST_TAG }}
+
+    - name: Image summary
+      run: |
+        echo "### :rocket: Spring Boot Image Published" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Registry:** ${{ env.HARBOR_REGISTRY }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Project:** ${{ env.HARBOR_PROJECT }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Image:** ${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+        echo "- \`${{ steps.meta.outputs.IMAGE_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "- \`${{ steps.meta.outputs.LATEST_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Full image path:**" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.LATEST_TAG }}" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

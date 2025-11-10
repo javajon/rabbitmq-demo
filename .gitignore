@@ -1,0 +1,58 @@
+# Secrets and credentials - NEVER commit these!
+*.pem
+*.key
+*.crt
+*-credentials.txt
+*-pullsecret.yaml
+.env
+.env.*
+
+# Java / Gradle
+.gradle/
+build/
+target/
+*.jar
+*.war
+*.ear
+*.class
+.gradletasknamecache
+
+# Spring Boot
+spring-boot-devtools.properties
+
+# IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.venv
+*.egg-info/
+dist/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+k8s/harbor-pullsecret.yaml
