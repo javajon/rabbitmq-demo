@@ -8,18 +8,22 @@ This is the easiest and most secure method to access RabbitMQ.
 
 ### Step 1: Set up port forwarding
 
+Forward RabbitMQ management port to your laptop:
+
 ```bash
-# Forward RabbitMQ management port to your laptop
 kubectl get services -n rabbitmq
 kubectl port-forward -n rabbitmq svc/rabbitmq 15672:15672 5672:5672
+```
 
-# The command will output:
-# Forwarding from 127.0.0.1:15672 -> 15672
-# Forwarding from [::1]:15672 -> 15672
-# Forwarding from 127.0.0.1:5672 -> 5672
-# Forwarding from [::1]:5672 -> 5672
-# Handling connection for 15672
-# Handling connection for 15672
+The command will output:
+
+```bash
+Forwarding from 127.0.0.1:15672 -> 15672
+Forwarding from [::1]:15672 -> 15672
+Forwarding from 127.0.0.1:5672 -> 5672
+Forwarding from [::1]:5672 -> 5672
+Handling connection for 15672
+Handling connection for 15672
 ```
 
 Now you can:
@@ -49,33 +53,40 @@ To stop port forwarding, press `Ctrl+C` in the terminal.
 ### Port already in use
 
 If you get "bind: address already in use" error:
+
+Find what's using port 15672:
 ```bash
-# Find what's using port 15672
 lsof -i :15672  # On macOS/Linux
 netstat -ano | findstr :15672  # On Windows
-
-# Use a different local port
-kubectl port-forward -n rabbitmq svc/rabbitmq 8080:15672 5672:5672
-# Then access at http://localhost:8080
 ```
+
+Use a different local port:
+```bash
+kubectl port-forward -n rabbitmq svc/rabbitmq 8080:15672 5672:5672
+```
+
+Then access at `http://localhost:8080`
 
 ### Connection refused
 
 If the port-forward succeeds but browser shows connection refused:
-```bash
-# Check if RabbitMQ pod is running
-kubectl get pods -n rabbitmq
 
-# Check if management plugin is enabled
+Check if RabbitMQ pod is running:
+```bash
+kubectl get pods -n rabbitmq
+```
+
+Check if management plugin is enabled:
+```bash
 kubectl exec -it rabbitmq-0 -n rabbitmq -- rabbitmq-plugins list | grep management
 ```
 
 ### Lost connection
 
-If port-forward disconnects:
+If port-forward disconnects, run with automatic reconnection:
+
 ```bash
-# Run with automatic reconnection
-while true; do 
+while true; do
     kubectl port-forward -n rabbitmq svc/rabbitmq 15672:15672 5672:5672
     sleep 1
 done
@@ -196,13 +207,15 @@ connection = pika.BlockingConnection(
 
 Open a terminal and run these commands:
 
+Set environment variables for local development:
 ```bash
-# Set environment variables for local development
 export RABBITMQ_HOST=localhost
 export RABBITMQ_USER=admin
 export RABBITMQ_PASS=admin
+```
 
-# Forward both management UI and AMQP port (keep this running)
+Forward both management UI and AMQP port (keep this running):
+```bash
 kubectl port-forward -n rabbitmq svc/rabbitmq 15672:15672 5672:5672
 ```
 
@@ -210,11 +223,13 @@ kubectl port-forward -n rabbitmq svc/rabbitmq 15672:15672 5672:5672
 
 ### 2. Install Python RabbitMQ Client
 
+Install pika (Python RabbitMQ client):
 ```bash
-# Install pika (Python RabbitMQ client)
 pip install pika
+```
 
-# Or if using pip3
+Or if using pip3:
+```bash
 pip3 install pika
 ```
 
@@ -329,8 +344,9 @@ export RABBITMQ_HOST=localhost
 export RABBITMQ_USER=admin
 export RABBITMQ_PASS=admin
 python consume.py
-# You'll see: [*] Waiting for messages. To exit press CTRL+C
 ```
+
+You'll see: `[*] Waiting for messages. To exit press CTRL+C`
 
 **Terminal 2** - Run the producer:
 ```bash
@@ -338,8 +354,9 @@ export RABBITMQ_HOST=localhost
 export RABBITMQ_USER=admin
 export RABBITMQ_PASS=admin
 python produce.py
-# Run multiple times to send more messages
 ```
+
+Run multiple times to send more messages.
 
 Watch Terminal 1 to see messages appear!
 
@@ -655,8 +672,9 @@ This repository demonstrates:
 ## Troubleshooting Local Testing
 
 ### Port-forward disconnects
+
+Run with automatic reconnection:
 ```bash
-# Run with automatic reconnection
 while true; do
     kubectl port-forward -n rabbitmq svc/rabbitmq 5672:5672 15672:15672
     sleep 1
@@ -664,8 +682,9 @@ done
 ```
 
 ### Connection timeout
+
+Add connection timeout and retry logic:
 ```python
-# Add connection timeout and retry logic
 import os
 import pika
 import pika.exceptions
